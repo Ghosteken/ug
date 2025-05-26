@@ -4,13 +4,13 @@ import { usePoints } from './PointsContext';
 import './waste.css';
 
 const wasteTypes = [
-  { type: 'Plastic', points: 100, description: 'Plastic bottles, containers, packaging' },
-  { type: 'Paper', points: 50, description: 'Newspapers, cardboard, paper bags' },
-  { type: 'Glass', points: 75, description: 'Glass bottles, jars' },
-  { type: 'Metal', points: 100, description: 'Aluminum cans, steel containers' },
-  { type: 'Organic', points: 50, description: 'Food waste, garden waste' },
-  { type: 'Electronic', points: 150, description: 'Old devices, batteries, cables' },
-  { type: 'Hazardous', points: 200, description: 'Chemicals, paints, solvents' }
+  { type: 'Plastic', points: 100, description: 'Plastic bottles, containers, packaging', minWeight: 0.1 },
+  { type: 'Paper', points: 50, description: 'Newspapers, cardboard, paper bags', minWeight: 0.5 },
+  { type: 'Glass', points: 75, description: 'Glass bottles, jars', minWeight: 0.3 },
+  { type: 'Metal', points: 100, description: 'Aluminum cans, steel containers', minWeight: 0.2 },
+  { type: 'Organic', points: 50, description: 'Food waste, garden waste', minWeight: 1.0 },
+  { type: 'Electronic', points: 150, description: 'Old devices, batteries, cables', minWeight: 0.5 },
+  { type: 'Hazardous', points: 200, description: 'Chemicals, paints, solvents', minWeight: 0.2 }
 ];
 
 export default function UploadWaste() {
@@ -19,6 +19,9 @@ export default function UploadWaste() {
   const [location, setLocation] = useState('');
   const [selectedType, setSelectedType] = useState('');
   const [imagePreview, setImagePreview] = useState(null);
+  const [weight, setWeight] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const [description, setDescription] = useState('');
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -32,22 +35,33 @@ export default function UploadWaste() {
     }
   };
 
+  const calculatePoints = (wasteType, weight, quantity) => {
+    const basePoints = wasteType.points;
+    const weightMultiplier = Math.max(1, Math.floor(weight / wasteType.minWeight));
+    return basePoints * weightMultiplier * quantity;
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!image || !selectedType || !location) {
-      alert('Please fill in all fields');
+    if (!image || !selectedType || !location || !weight) {
+      alert('Please fill in all required fields');
       return;
     }
 
     const wasteType = wasteTypes.find(w => w.type === selectedType);
+    const calculatedPoints = calculatePoints(wasteType, parseFloat(weight), quantity);
+
     const newSubmission = {
       id: Date.now(),
       date: new Date().toISOString().slice(0, 10),
       type: wasteType.type,
-      points: wasteType.points,
+      points: calculatedPoints,
       location,
       imageUrl: imagePreview,
+      weight: parseFloat(weight),
+      quantity,
+      description: description.trim() || 'No description provided',
     };
 
     addSubmission(newSubmission);
@@ -57,6 +71,9 @@ export default function UploadWaste() {
     setImagePreview(null);
     setLocation('');
     setSelectedType('');
+    setWeight('');
+    setQuantity(1);
+    setDescription('');
     e.target.reset();
   };
 
@@ -78,6 +95,41 @@ export default function UploadWaste() {
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="form-group">
+          <label>Weight (kg)</label>
+          <input
+            type="number"
+            step="0.1"
+            min="0.1"
+            value={weight}
+            onChange={(e) => setWeight(e.target.value)}
+            placeholder="Enter weight in kilograms"
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Quantity</label>
+          <input
+            type="number"
+            min="1"
+            value={quantity}
+            onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+            placeholder="Number of items"
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Description (Optional)</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Add any additional details about the waste"
+            rows="3"
+          />
         </div>
 
         <div className="form-group">
@@ -105,6 +157,16 @@ export default function UploadWaste() {
             required
           />
         </div>
+
+        {selectedType && weight && quantity && (
+          <div className="points-preview">
+            <p>Estimated Points: {calculatePoints(
+              wasteTypes.find(w => w.type === selectedType),
+              parseFloat(weight) || 0,
+              quantity
+            )}</p>
+          </div>
+        )}
 
         <button type="submit" className="submit-btn">Submit Waste</button>
       </form>
