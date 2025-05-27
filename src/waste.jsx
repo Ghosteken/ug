@@ -1,27 +1,59 @@
 // UploadWaste.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePoints } from './PointsContext';
 import './waste.css';
 
 const wasteTypes = [
-  { type: 'Plastic', points: 100, description: 'Plastic bottles, containers, packaging', minWeight: 0.1 },
-  { type: 'Paper', points: 50, description: 'Newspapers, cardboard, paper bags', minWeight: 0.5 },
-  { type: 'Glass', points: 75, description: 'Glass bottles, jars', minWeight: 0.3 },
-  { type: 'Metal', points: 100, description: 'Aluminum cans, steel containers', minWeight: 0.2 },
-  { type: 'Organic', points: 50, description: 'Food waste, garden waste', minWeight: 1.0 },
-  { type: 'Electronic', points: 150, description: 'Old devices, batteries, cables', minWeight: 0.5 },
-  { type: 'Hazardous', points: 200, description: 'Chemicals, paints, solvents', minWeight: 0.2 }
+  { type: 'Plastic', points: 100, description: 'Plastic bottles, containers, packaging', minWeight: 0.1, maxWeight: 5 },
+  { type: 'Paper', points: 50, description: 'Newspapers, cardboard, paper bags', minWeight: 0.5, maxWeight: 10 },
+  { type: 'Glass', points: 75, description: 'Glass bottles, jars', minWeight: 0.3, maxWeight: 8 },
+  { type: 'Metal', points: 100, description: 'Aluminum cans, steel containers', minWeight: 0.2, maxWeight: 6 },
+  { type: 'Organic', points: 50, description: 'Food waste, garden waste', minWeight: 1.0, maxWeight: 15 },
+  { type: 'Electronic', points: 150, description: 'Old devices, batteries, cables', minWeight: 0.5, maxWeight: 12 },
+  { type: 'Hazardous', points: 200, description: 'Chemicals, paints, solvents', minWeight: 0.2, maxWeight: 4 }
 ];
 
 export default function UploadWaste() {
   const { addSubmission } = usePoints();
   const [image, setImage] = useState(null);
   const [location, setLocation] = useState('');
-  const [selectedType, setSelectedType] = useState('');
   const [imagePreview, setImagePreview] = useState(null);
-  const [weight, setWeight] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [description, setDescription] = useState('');
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Simulate AI analysis of waste image
+  const analyzeWasteImage = () => {
+    setIsAnalyzing(true);
+    
+    // Simulate processing delay
+    setTimeout(() => {
+      // Randomly select waste type
+      const randomWasteType = wasteTypes[Math.floor(Math.random() * wasteTypes.length)];
+      
+      // Generate random weight within type's range
+      const randomWeight = (
+        Math.random() * (randomWasteType.maxWeight - randomWasteType.minWeight) + 
+        randomWasteType.minWeight
+      ).toFixed(1);
+      
+      // Generate random quantity (1-5 items)
+      const randomQuantity = Math.floor(Math.random() * 5) + 1;
+      
+      // Calculate points
+      const basePoints = randomWasteType.points;
+      const weightMultiplier = Math.max(1, Math.floor(randomWeight / randomWasteType.minWeight));
+      const totalPoints = basePoints * weightMultiplier * randomQuantity;
+
+      setAnalysisResult({
+        type: randomWasteType.type,
+        weight: parseFloat(randomWeight),
+        quantity: randomQuantity,
+        points: totalPoints
+      });
+      
+      setIsAnalyzing(false);
+    }, 2000); // 2 second delay to simulate processing
+  };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -30,38 +62,30 @@ export default function UploadWaste() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result);
+        // Start analysis when image is loaded
+        analyzeWasteImage();
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const calculatePoints = (wasteType, weight, quantity) => {
-    const basePoints = wasteType.points;
-    const weightMultiplier = Math.max(1, Math.floor(weight / wasteType.minWeight));
-    return basePoints * weightMultiplier * quantity;
-  };
-
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!image || !selectedType || !location || !weight) {
-      alert('Please fill in all required fields');
+    if (!image || !location || !analysisResult) {
+      alert('Please fill in all required fields and wait for analysis to complete');
       return;
     }
-
-    const wasteType = wasteTypes.find(w => w.type === selectedType);
-    const calculatedPoints = calculatePoints(wasteType, parseFloat(weight), quantity);
 
     const newSubmission = {
       id: Date.now(),
       date: new Date().toISOString().slice(0, 10),
-      type: wasteType.type,
-      points: calculatedPoints,
+      type: analysisResult.type,
+      points: analysisResult.points,
       location,
       imageUrl: imagePreview,
-      weight: parseFloat(weight),
-      quantity,
-      description: description.trim() || 'No description provided',
+      weight: analysisResult.weight,
+      quantity: analysisResult.quantity
     };
 
     addSubmission(newSubmission);
@@ -70,10 +94,7 @@ export default function UploadWaste() {
     setImage(null);
     setImagePreview(null);
     setLocation('');
-    setSelectedType('');
-    setWeight('');
-    setQuantity(1);
-    setDescription('');
+    setAnalysisResult(null);
     e.target.reset();
   };
 
@@ -81,57 +102,6 @@ export default function UploadWaste() {
     <div className="upload-container">
       <h2>Upload Your Waste</h2>
       <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Waste Type</label>
-          <select 
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value)}
-            required
-          >
-            <option value="">Select waste type</option>
-            {wasteTypes.map(waste => (
-              <option key={waste.type} value={waste.type}>
-                {waste.type} ({waste.points} points) - {waste.description}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label>Weight (kg)</label>
-          <input
-            type="number"
-            step="0.1"
-            min="0.1"
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-            placeholder="Enter weight in kilograms"
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Quantity</label>
-          <input
-            type="number"
-            min="1"
-            value={quantity}
-            onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-            placeholder="Number of items"
-            required
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Description (Optional)</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Add any additional details about the waste"
-            rows="3"
-          />
-        </div>
-
         <div className="form-group">
           <label>Waste Image</label>
           <input 
@@ -147,6 +117,29 @@ export default function UploadWaste() {
           )}
         </div>
 
+        {isAnalyzing ? (
+          <div className="analysis-status">
+            <div className="spinner"></div>
+            <p>Analyzing waste image...</p>
+          </div>
+        ) : analysisResult && (
+          <div className="analysis-result">
+            <h3>Analysis Results</h3>
+            <div className="result-item">
+              <span>Type:</span> {analysisResult.type}
+            </div>
+            <div className="result-item">
+              <span>Weight:</span> {analysisResult.weight} kg
+            </div>
+            <div className="result-item">
+              <span>Quantity:</span> {analysisResult.quantity} items
+            </div>
+            <div className="result-item points">
+              <span>Points Earned:</span> {analysisResult.points}
+            </div>
+          </div>
+        )}
+
         <div className="form-group">
           <label>Location</label>
           <input 
@@ -158,17 +151,13 @@ export default function UploadWaste() {
           />
         </div>
 
-        {selectedType && weight && quantity && (
-          <div className="points-preview">
-            <p>Estimated Points: {calculatePoints(
-              wasteTypes.find(w => w.type === selectedType),
-              parseFloat(weight) || 0,
-              quantity
-            )}</p>
-          </div>
-        )}
-
-        <button type="submit" className="submit-btn">Submit Waste</button>
+        <button 
+          type="submit" 
+          className="submit-btn"
+          disabled={isAnalyzing || !analysisResult}
+        >
+          {isAnalyzing ? 'Analyzing...' : 'Submit Waste'}
+        </button>
       </form>
     </div>
   );
